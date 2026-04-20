@@ -48,7 +48,7 @@ test('typed: LambdaAdapterOptions typechecks the full options surface', t => {
     policy: {defaultLimit: 25, maxLimit: 200, needTotal: false},
     sortableIndices: {name: 'by-name-index'},
     keyFromPath: (raw, adp) => ({[adp.keyFields[0]]: raw}),
-    exampleFromContext: (query, _body, event, context) => ({
+    exampleFromContext: ({query, event, context}) => ({
       tenant: query.tenant ?? 'default',
       requestId: context.awsRequestId,
       method: 'httpMethod' in event ? event.httpMethod : event.requestContext.http.method

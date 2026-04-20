@@ -157,13 +157,15 @@ test('custom keyFromPath receives the raw segment + adapter', async t => {
   });
 });
 
-test('exampleFromContext receives (query, body, event, context)', async t => {
+test('exampleFromContext receives {query, body, adapter, framework, event, context}', async t => {
   const adapter = makeMockAdapter();
   const seen = [];
-  const exampleFromContext = (query, body, event, context) => {
+  const exampleFromContext = ({query, body, adapter: adp, framework, event, context}) => {
     seen.push({
       query,
       body,
+      framework,
+      adapterIsSame: adp === adapter,
       rawPath: event.rawPath,
       method: event.requestContext.http.method,
       awsRequestId: context.awsRequestId
@@ -173,10 +175,31 @@ test('exampleFromContext receives (query, body, event, context)', async t => {
   await withLambdaHandler(createLambdaAdapter(adapter, {exampleFromContext}), async client => {
     await client('/?tenant=acme&limit=5');
     t.equal(seen[0].query.tenant, 'acme');
+    t.equal(seen[0].framework, 'lambda');
     t.equal(seen[0].method, 'GET');
     t.equal(seen[0].rawPath, '/');
+    t.equal(seen[0].body, null, 'body is null on GET /');
+    t.ok(seen[0].adapterIsSame, 'adapter in options bag is the same Adapter instance');
     t.equal(seen[0].awsRequestId, 'test-req-id', 'context is threaded through');
     t.equal(adapter.calls[0].example.tenant, 'acme');
+  });
+});
+
+test('exampleFromContext on PUT /-clone receives the parsed overlay body', async t => {
+  const adapter = makeMockAdapter();
+  const seen = [];
+  const exampleFromContext = ({query, body}) => {
+    seen.push({query, body});
+    return {};
+  };
+  await withLambdaHandler(createLambdaAdapter(adapter, {exampleFromContext}), async client => {
+    await client('/-clone?tenant=acme', {
+      method: 'PUT',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({tag: 'cloned'})
+    });
+    t.deepEqual(seen[0].body, {tag: 'cloned'});
+    t.equal(seen[0].query.tenant, 'acme');
   });
 });
 
@@ -199,7 +222,7 @@ test('sortableIndices: ?sort=-name sets descending', async t => {
 test('v2 cookies flatten into event.headers.cookie for exampleFromContext', async t => {
   const adapter = makeMockAdapter();
   let seenCookie;
-  const exampleFromContext = (_q, _b, event) => {
+  const exampleFromContext = ({event}) => {
     seenCookie = event.headers?.cookie;
     return {};
   };
@@ -212,7 +235,7 @@ test('v2 cookies flatten into event.headers.cookie for exampleFromContext', asyn
 test('v2 cookies merge with existing cookie header', async t => {
   const adapter = makeMockAdapter();
   let seenCookie;
-  const exampleFromContext = (_q, _b, event) => {
+  const exampleFromContext = ({event}) => {
     seenCookie = event.headers?.cookie;
     return {};
   };
@@ -220,4 +243,13 @@ test('v2 cookies merge with existing cookie header', async t => {
   const event = makeV2Event('GET', '/', {headers: {cookie: 'pre=exists'}, cookies: ['sid=abc']});
   await handler(event, makeContext());
   t.equal(seenCookie, 'pre=exists; sid=abc', 'existing header is preserved, cookies appended');
+});
+
+test('mountPath with trailing slash is normalized', async t => {
+  const adapter = makeMockAdapter();
+  const handler = createLambdaAdapter(adapter, {mountPath: '/planets/'});
+  const event = makeV2Event('GET', '/planets/earth');
+  const res = await handler(event, makeContext());
+  t.equal(res.statusCode, 200, 'route matched under trailing-slash mount');
+  t.deepEqual(adapter.calls[0].key, {name: 'earth'});
 });

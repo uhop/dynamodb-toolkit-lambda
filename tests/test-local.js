@@ -74,7 +74,7 @@ test('createNodeListener: v1 event shape exposes event.path to the handler', asy
   let seenEvent;
   const adapter = makeMockAdapter();
   const handler = createLambdaAdapter(adapter, {
-    exampleFromContext: (_q, _b, event) => {
+    exampleFromContext: ({event}) => {
       seenEvent = event;
       return {};
     }
@@ -91,7 +91,7 @@ test('createNodeListener: binary body is base64-encoded before reaching the hand
   let seen;
   const probeAdapter = makeMockAdapter();
   const probe = createLambdaAdapter(probeAdapter, {
-    exampleFromContext: (_q, _b, event) => {
+    exampleFromContext: ({event}) => {
       seen = {body: event.body, isBase64Encoded: event.isBase64Encoded};
       return {};
     }
@@ -140,7 +140,7 @@ test('createFetchBridge: v2 cookies flow through to exampleFromContext', async t
   const adapter = makeMockAdapter();
   let seenCookie;
   const handler = createLambdaAdapter(adapter, {
-    exampleFromContext: (_q, _b, event) => {
+    exampleFromContext: ({event}) => {
       seenCookie = event.headers?.cookie;
       return {};
     }

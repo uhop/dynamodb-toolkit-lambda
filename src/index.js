@@ -11,17 +11,18 @@
 // shape — translated for Lambda's event-in / plain-object-out I/O.
 
 import {
-  parseFields,
-  parseSort,
-  parseFilter,
   parsePatch,
   parseNames,
-  parsePaging,
+  parseFields,
   parseFlag,
   buildEnvelope,
   paginationLinks,
   mergePolicy,
-  mapErrorStatus
+  mapErrorStatus,
+  buildListOptions,
+  resolveSort,
+  stripMount,
+  validateWriteBody
 } from 'dynamodb-toolkit/rest-core';
 import {matchRoute} from 'dynamodb-toolkit/handler';
 
@@ -48,7 +49,10 @@ const readPath = (event, kind) => (kind === 'v2' ? event.rawPath : event.path);
 // default. v2 / Function URL have no multi-value mode.
 const wantsMultiValueHeaders = (event, kind) => {
   if (kind === 'v2') return false;
-  return !!(event.multiValueHeaders && !event.headers);
+  // ALB multi-value mode stamps `headers: null` explicitly; require the null
+  // sentinel rather than any falsy value so a malformed synthetic event with
+  // `headers: undefined` doesn't flip us into multi-value mode.
+  return !!(event.multiValueHeaders && event.headers === null);
 };
 
 // First-value-wins query object for rest-core parsers — same policy as the koa
@@ -85,13 +89,6 @@ const serializeQuery = (event, kind) => {
     }
   }
   return sp.toString();
-};
-
-const stripMount = (pathname, mountPath) => {
-  if (!mountPath) return pathname;
-  if (pathname === mountPath) return '/';
-  if (pathname.startsWith(mountPath + '/')) return pathname.slice(mountPath.length);
-  return null;
 };
 
 // API Gateway v2 / Function URL put cookies in `event.cookies: string[]`
@@ -131,23 +128,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   const maxBodyBytes = options.maxBodyBytes ?? 1024 * 1024;
   const mountPath = options.mountPath || '';
 
-  const buildListOptions = query => {
-    const fields = parseFields(query.fields);
-    const filter = parseFilter(query.filter);
-    const paging = parsePaging(query, {defaultLimit: policy.defaultLimit, maxLimit: policy.maxLimit, maxOffset: policy.maxOffset});
-    const consistent = parseFlag(query.consistent);
-    /** @type {import('dynamodb-toolkit').ListOptions} */
-    const out = {...paging, consistent, needTotal: policy.needTotal};
-    if (fields) out.fields = fields;
-    if (filter) out.filter = filter.query;
-    return out;
-  };
-
-  const resolveSort = query => {
-    const sort = parseSort(query.sort);
-    if (!sort) return {index: undefined, descending: false};
-    return {index: sortableIndices[sort.field], descending: sort.direction === 'desc'};
-  };
+  const makeExampleCtx = (query, body, event, context) => ({query, body, adapter, framework: 'lambda', event, context});
 
   const jsonResponse = (status, body) => ({status, body: JSON.stringify(body), headers: JSON_HEADERS});
   const emptyResponse = (status = 204) => ({status, body: ''});
@@ -173,10 +154,11 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   // --- collection-level handlers ---
 
   const handleGetAll = async (event, context, kind, query) => {
-    const opts = buildListOptions(query);
-    const {index, descending} = resolveSort(query);
+    /** @type {import('dynamodb-toolkit').ListOptions} */
+    const opts = buildListOptions(query, policy);
+    const {index, descending} = resolveSort(query, sortableIndices);
     if (descending) opts.descending = true;
-    const example = exampleFromContext(query, null, event, context);
+    const example = exampleFromContext(makeExampleCtx(query, null, event, context));
     const result = await adapter.getAll(opts, example, index);
 
     const links = paginationLinks(result.offset, result.limit, result.total, urlBuilderFor(event, kind));
@@ -186,15 +168,16 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   };
 
   const handlePost = async event => {
-    const body = await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes);
+    const body = validateWriteBody(await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes));
     await adapter.post(body);
     return emptyResponse();
   };
 
   const handleDeleteAll = async (event, context, query) => {
-    const opts = buildListOptions(query);
-    const {index} = resolveSort(query);
-    const example = exampleFromContext(query, null, event, context);
+    /** @type {import('dynamodb-toolkit').ListOptions} */
+    const opts = buildListOptions(query, policy);
+    const {index} = resolveSort(query, sortableIndices);
+    const example = exampleFromContext(makeExampleCtx(query, null, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
     const r = await adapter.deleteAllByParams(params);
     return jsonResponse(200, {processed: r.processed});
@@ -257,9 +240,10 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   const handleCloneAll = async (event, context, query) => {
     const body = await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes);
     const overlay = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
-    const opts = buildListOptions(query);
-    const {index} = resolveSort(query);
-    const example = exampleFromContext(query, body, event, context);
+    /** @type {import('dynamodb-toolkit').ListOptions} */
+    const opts = buildListOptions(query, policy);
+    const {index} = resolveSort(query, sortableIndices);
+    const example = exampleFromContext(makeExampleCtx(query, body, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
     const r = await adapter.cloneAllByParams(params, item => ({...item, ...overlay}));
     return jsonResponse(200, {processed: r.processed});
@@ -268,9 +252,10 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   const handleMoveAll = async (event, context, query) => {
     const body = await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes);
     const overlay = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
-    const opts = buildListOptions(query);
-    const {index} = resolveSort(query);
-    const example = exampleFromContext(query, body, event, context);
+    /** @type {import('dynamodb-toolkit').ListOptions} */
+    const opts = buildListOptions(query, policy);
+    const {index} = resolveSort(query, sortableIndices);
+    const example = exampleFromContext(makeExampleCtx(query, body, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
     const r = await adapter.moveAllByParams(params, item => ({...item, ...overlay}));
     return jsonResponse(200, {processed: r.processed});
@@ -287,7 +272,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   };
 
   const handleItemPut = async (event, key, query) => {
-    const body = /** @type {Record<string, unknown>} */ (await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes));
+    const body = /** @type {Record<string, unknown>} */ (validateWriteBody(await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes)));
     const force = parseFlag(query.force);
     const merged = {...body, ...key};
     await adapter.put(merged, {force});
@@ -295,7 +280,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
   };
 
   const handleItemPatch = async (event, key) => {
-    const body = /** @type {Record<string, unknown>} */ (await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes));
+    const body = /** @type {Record<string, unknown>} */ (validateWriteBody(await readJsonBody(event.body, event.isBase64Encoded, maxBodyBytes)));
     const {patch, options: patchOptions} = parsePatch(body, {metaPrefix: policy.metaPrefix});
     await adapter.patch(key, patch, patchOptions);
     return emptyResponse();

@@ -19,11 +19,20 @@ export function createLambdaAdapter<TItem extends Record<string, unknown>>(
   options?: LambdaAdapterOptions<TItem>
 ): (event: LambdaEvent, context: Context) => Promise<LambdaResult>;
 
+export interface LambdaExampleContext<TItem> {
+  query: Record<string, string>;
+  body: unknown;
+  adapter: Adapter<TItem>;
+  framework: 'lambda';
+  event: LambdaEvent;
+  context: Context;
+}
+
 export interface LambdaAdapterOptions<TItem> {
   policy?: Partial<Policy>;
   sortableIndices?: Record<string, string>;
   keyFromPath?: (rawKey: string, adapter: Adapter<TItem>) => Record<string, unknown>;
-  exampleFromContext?: (query: Record<string, string>, body: unknown, event: LambdaEvent, context: Context) => Record<string, unknown>;
+  exampleFromContext?: (context: LambdaExampleContext<TItem>) => Record<string, unknown>;
   maxBodyBytes?: number;
   mountPath?: string;
 }

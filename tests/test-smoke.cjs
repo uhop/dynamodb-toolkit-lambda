@@ -34,7 +34,7 @@ test('cjs: factory accepts the full options surface', t => {
     policy: {statusCodes: {miss: 410}},
     sortableIndices: {name: 'by-name-index'},
     keyFromPath: (raw, adp) => ({[adp.keyFields[0]]: raw}),
-    exampleFromContext: (query, _body, event, _context) => ({tenant: query.tenant || event.headers?.['x-tenant'] || 'default'}),
+    exampleFromContext: ({query, event}) => ({tenant: query.tenant || event.headers?.['x-tenant'] || 'default'}),
     maxBodyBytes: 64 * 1024,
     mountPath: '/things'
   });

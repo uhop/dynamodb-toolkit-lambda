@@ -26,6 +26,31 @@ export type LambdaEvent = APIGatewayProxyEvent | APIGatewayProxyEventV2 | ALBEve
  */
 export type LambdaResult = APIGatewayProxyResult | APIGatewayProxyStructuredResultV2 | ALBResult;
 
+/**
+ * Context passed to {@link LambdaAdapterOptions.exampleFromContext}. Mirrors
+ * the shape used by the other framework adapters so cross-adapter callbacks
+ * can branch on `framework`; Lambda keeps both `event` and `context`
+ * because AWS exposes request metadata across both objects (identity /
+ * authorizer claims on `event.requestContext`, correlation IDs on `context`).
+ */
+export interface LambdaExampleContext<TItem extends Record<string, unknown> = Record<string, unknown>> {
+  /** Parsed URL query-string (first value per repeated key). */
+  query: Record<string, string>;
+  /**
+   * Parsed JSON body. Always the parsed body before the call — `null` only
+   * when the request had no body, not as a placeholder for unread bodies.
+   */
+  body: unknown;
+  /** The Adapter targeted by this handler. */
+  adapter: Adapter<TItem>;
+  /** Discriminator for cross-adapter callbacks. */
+  framework: 'lambda';
+  /** The full Lambda event — v1, v2, or ALB shape. */
+  event: LambdaEvent;
+  /** The Lambda context (request ID, deadline info, invoked ARN). */
+  context: Context;
+}
+
 /** Options for {@link createLambdaAdapter}. */
 export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Record<string, unknown>> {
   /** Partial overrides for the REST policy (merged with the default). */
@@ -62,24 +87,16 @@ export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Re
    * Default: `() => ({})` — no example; `prepareListInput` derives everything
    * from the `index` argument alone.
    *
-   * Receives both the Lambda `event` and the Lambda `context` so tenants can
-   * reach anything the runtime exposes (`event.requestContext.identity` /
-   * `authorizer` claims on v1, `event.requestContext.authorizer.lambda` on v2,
-   * `context.awsRequestId` for correlation, `context.invokedFunctionArn` for
-   * multi-env routing). v2 cookies are already flattened into
-   * `event.headers.cookie` before this hook is invoked, so reading cookies
-   * looks the same regardless of trigger.
-   *
-   * @param query Parsed URL query-string (first value per key).
-   * @param body Parsed request body. `null` on `GET /` and `DELETE /`; the
-   *   overlay object on `PUT /-clone` / `PUT /-move`.
-   * @param event The full Lambda event — v1, v2, or ALB shape.
-   * @param context The Lambda context (request ID, deadline info, invoked ARN).
-   * @returns The `example` argument threaded into `Adapter.prepareListInput`.
-   *   Typically shapes a `KeyConditionExpression` for a GSI (e.g.
-   *   `{tenantId: resolveTenant(event)}` for per-tenant scoping).
+   * Takes an options bag of `{query, body, adapter, framework: 'lambda', event, context}`;
+   * the shape matches the other framework adapters so a tenant-scoping
+   * callback can be shared across koa, express, fetch, and lambda. Lambda-
+   * specific context (`event.requestContext.identity` / `authorizer` claims
+   * on v1, `event.requestContext.authorizer.lambda` on v2,
+   * `context.awsRequestId` for correlation) is reachable through the `event`
+   * and `context` fields. v2 cookies are already flattened into
+   * `event.headers.cookie` before this hook is invoked.
    */
-  exampleFromContext?: (query: Record<string, string>, body: unknown, event: LambdaEvent, context: Context) => Record<string, unknown>;
+  exampleFromContext?: (context: LambdaExampleContext<TItem>) => Record<string, unknown>;
   /**
    * Cap for the request body in bytes. Enforced on every body-reading route.
    * The adapter rejects with `413 PayloadTooLarge` when the decoded body
@@ -89,6 +106,8 @@ export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Re
    * REST, 1 MB for HTTP v2 + Function URL, varies for ALB). This option is
    * for tenant-level rejection before `JSON.parse` — useful when you want to
    * reject 2 MB JSON on a write endpoint whose real use case maxes out at 64 KB.
+   * Setting `maxBodyBytes` higher than the trigger's platform cap is silently
+   * ineffective — Lambda rejects upstream before the adapter runs.
    *
    * Default: `1048576` (1 MiB), matching the bundled `node:http` handler and
    * the koa / express / fetch adapters.
@@ -133,6 +152,10 @@ export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Re
  * Dispatch behavior:
  * - Unknown route or off-mount request → empty `404`.
  * - Known shape, unsupported method → `405 Method Not Allowed` with a JSON body.
+ * - `HEAD /:key` auto-promotes to `GET /:key` via the parent toolkit's
+ *   `matchRoute`; body is serialized normally (Lambda's trigger strips it for HEAD).
+ * - Write routes (POST /, PUT /:key, PATCH /:key) require a JSON object body;
+ *   `null` / arrays / primitives reject with `400 BadBody`.
  * - Thrown errors map through `policy.errorBody` + `mapErrorStatus` into a JSON
  *   body plus the matching status code.
  *
