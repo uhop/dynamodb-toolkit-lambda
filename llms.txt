@@ -1,0 +1,40 @@
+# dynamodb-toolkit-lambda
+
+> AWS Lambda adapter for `dynamodb-toolkit` v3. Serves the toolkit's standard REST route pack as a Lambda handler for API Gateway (REST / HTTP), Lambda Function URLs, and ALB.
+
+**Status:** scaffolding. API below is provisional.
+
+## Install
+
+```sh
+npm install dynamodb-toolkit-lambda dynamodb-toolkit
+```
+
+## Target API (provisional)
+
+```ts
+export function createLambdaAdapter<TItem>(
+  adapter: Adapter<TItem>,
+  options?: LambdaAdapterOptions<TItem>
+): Handler;  // per @types/aws-lambda — event → result
+```
+
+Auto-detects the payload format (v1 / v2 / ALB) from the incoming event shape and returns the matching result envelope.
+
+## Quick start
+
+```js
+import {Adapter} from 'dynamodb-toolkit';
+import {createLambdaAdapter} from 'dynamodb-toolkit-lambda';
+
+const adapter = new Adapter({client, table: 'planets', keyFields: ['name']});
+export const handler = createLambdaAdapter(adapter, {mountPath: '/planets'});
+```
+
+## Links
+
+- Parent toolkit: https://github.com/uhop/dynamodb-toolkit
+- Sibling (Fetch): https://github.com/uhop/dynamodb-toolkit-fetch
+- Sibling (Koa): https://github.com/uhop/dynamodb-toolkit-koa
+- Sibling (Express): https://github.com/uhop/dynamodb-toolkit-express
+- Route pack reference: https://github.com/uhop/dynamodb-toolkit/wiki/HTTP-handler
