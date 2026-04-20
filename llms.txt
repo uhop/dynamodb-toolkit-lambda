@@ -2,24 +2,31 @@
 
 > AWS Lambda adapter for `dynamodb-toolkit` v3. Serves the toolkit's standard REST route pack as a Lambda handler for API Gateway (REST / HTTP), Lambda Function URLs, and ALB.
 
-**Status:** scaffolding. API below is provisional.
-
 ## Install
 
 ```sh
 npm install dynamodb-toolkit-lambda dynamodb-toolkit
 ```
 
-## Target API (provisional)
+## API
 
 ```ts
 export function createLambdaAdapter<TItem>(
   adapter: Adapter<TItem>,
   options?: LambdaAdapterOptions<TItem>
-): Handler;  // per @types/aws-lambda — event → result
+): (event: LambdaEvent, context: Context) => Promise<LambdaResult>;
 ```
 
-Auto-detects the payload format (v1 / v2 / ALB) from the incoming event shape and returns the matching result envelope.
+Auto-detects the payload format (API Gateway v1 / v2 / Function URL / ALB) from the incoming event and returns the matching result envelope. Single factory, single handler.
+
+### Options
+
+- `policy` — partial overrides for the rest-core policy.
+- `sortableIndices` — `{field: gsiName}` map for `?sort=field`.
+- `keyFromPath` — `(rawKey, adapter) => keyObject`. Default uses `adapter.keyFields[0]`.
+- `exampleFromContext` — `(query, body, event, context) => example` threaded into `prepareListInput`. Receives both the Lambda event and context; v2 cookies are flattened into `event.headers.cookie` before this runs.
+- `maxBodyBytes` — tenant-level body cap (default 1 MiB). Enforced post-decode for base64 bodies.
+- `mountPath` — strip this prefix before dispatch. Same semantics as the Fetch adapter.
 
 ## Quick start
 
@@ -31,6 +38,18 @@ const adapter = new Adapter({client, table: 'planets', keyFields: ['name']});
 export const handler = createLambdaAdapter(adapter, {mountPath: '/planets'});
 ```
 
+## Local debugging
+
+Ships a zero-dep bridge so the exact Lambda handler drives real HTTP requests on localhost.
+
+```js
+import http from 'node:http';
+import {createNodeListener} from 'dynamodb-toolkit-lambda/local.js';
+http.createServer(createNodeListener(handler)).listen(3000);
+```
+
+Also exports `createFetchBridge(handler)` for Bun.serve / Deno.serve / Cloudflare Workers.
+
 ## Links
 
 - Parent toolkit: https://github.com/uhop/dynamodb-toolkit
@@ -38,3 +57,4 @@ export const handler = createLambdaAdapter(adapter, {mountPath: '/planets'});
 - Sibling (Koa): https://github.com/uhop/dynamodb-toolkit-koa
 - Sibling (Express): https://github.com/uhop/dynamodb-toolkit-express
 - Route pack reference: https://github.com/uhop/dynamodb-toolkit/wiki/HTTP-handler
+- Lambda adapter wiki: https://github.com/uhop/dynamodb-toolkit-lambda/wiki
