@@ -34,7 +34,7 @@ test('createNodeListener: GET / returns the mock envelope over real HTTP', async
     t.equal(res.status, 200);
     const body = await res.json();
     t.deepEqual(body.data, [{name: 'earth'}, {name: 'mars'}]);
-    t.equal(adapter.calls[0].fn, 'getAll');
+    t.equal(adapter.calls[0].fn, 'getList');
   });
 });
 

@@ -65,8 +65,8 @@ export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Re
    * route (`GET /:key`, `PUT /:key`, `PATCH /:key`, `DELETE /:key`, and the
    * single-item `-clone` / `-move` endpoints).
    *
-   * Default: `(raw, adp) => ({[adp.keyFields[0]]: raw})` — the raw string
-   * becomes the partition key. Override for composite keys (e.g.
+   * Default: `(raw, adp) => ({[adp.keyFields[0].name]: raw})` — the raw
+   * string becomes the partition key. Override for composite keys (e.g.
    * `${partition}:${sort}` → `{partition, sort}`), numeric coercion, or
    * URL-format validation.
    *
@@ -135,10 +135,10 @@ export interface LambdaAdapterOptions<TItem extends Record<string, unknown> = Re
  *
  * Routes (all rooted at {@link LambdaAdapterOptions.mountPath}, or at `/` when
  * no mount is set):
- * - `GET/POST/DELETE /` — getAll / post / deleteAllByParams
+ * - `GET/POST/DELETE /` — getList / post / deleteListByParams
  * - `GET /-by-names`, `DELETE /-by-names` — getByKeys / deleteByKeys
- * - `PUT /-load` — bulk putAll
- * - `PUT /-clone`, `PUT /-move` — cloneAllByParams / moveAllByParams (body is overlay)
+ * - `PUT /-load` — bulk putItems
+ * - `PUT /-clone`, `PUT /-move` — cloneListByParams / moveListByParams (body is overlay)
  * - `PUT /-clone-by-names`, `PUT /-move-by-names` — cloneByKeys / moveByKeys
  * - `GET/PUT/PATCH/DELETE /:key` — getByKey / put / patch / delete
  * - `PUT /:key/-clone`, `PUT /:key/-move` — single-item clone / move

@@ -47,7 +47,7 @@ test('typed: LambdaAdapterOptions typechecks the full options surface', t => {
   const opts: LambdaAdapterOptions<Planet> = {
     policy: {defaultLimit: 25, maxLimit: 200, needTotal: false},
     sortableIndices: {name: 'by-name-index'},
-    keyFromPath: (raw, adp) => ({[adp.keyFields[0]]: raw}),
+    keyFromPath: (raw, adp) => ({[adp.keyFields[0].name]: raw}),
     exampleFromContext: ({query, event, context}) => ({
       tenant: query.tenant ?? 'default',
       requestId: context.awsRequestId,

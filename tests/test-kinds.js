@@ -20,7 +20,7 @@ for (const kind of KINDS) {
     t.equal(res.statusCode, 200);
     const body = readJsonResult(res);
     t.deepEqual(body.data, [{name: 'earth'}, {name: 'mars'}], 'envelope data');
-    t.equal(adapter.calls[0].fn, 'getAll');
+    t.equal(adapter.calls[0].fn, 'getList');
     t.equal(typeof res.headers, 'object', 'single-value headers on by default');
     t.notOk(res.multiValueHeaders, 'no multiValueHeaders when event is single-value');
   });
@@ -55,7 +55,7 @@ for (const kind of KINDS) {
 
   test(`[${kind}] pagination link path preserves trigger's path shape`, async t => {
     const adapter = makeMockAdapter({
-      async getAll(opts) {
+      async getList(opts) {
         return {data: [{name: 'a'}], offset: opts.offset, limit: opts.limit, total: 20};
       }
     });

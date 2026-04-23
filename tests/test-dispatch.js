@@ -44,13 +44,13 @@ test('mountPath — root of mount maps to adapter root', async t => {
   const handler = createLambdaAdapter(adapter, {mountPath: '/planets'});
   const client = makeClient(handler);
   const res = await client('/planets');
-  t.equal(res.statusCode, 200, 'GET /planets → adapter root getAll');
-  t.equal(adapter.calls[0].fn, 'getAll');
+  t.equal(res.statusCode, 200, 'GET /planets → adapter root getList');
+  t.equal(adapter.calls[0].fn, 'getList');
 });
 
 test('pagination links preserve mountPath in URL', async t => {
   const adapter = makeMockAdapter({
-    async getAll(opts) {
+    async getList(opts) {
       return {data: [{name: 'a'}], offset: opts.offset, limit: opts.limit, total: 20};
     }
   });
@@ -142,7 +142,12 @@ test('custom policy overrides envelope keys + miss status', async t => {
 });
 
 test('custom keyFromPath receives the raw segment + adapter', async t => {
-  const adapter = makeMockAdapter({keyFields: ['pk', 'sk']});
+  const adapter = makeMockAdapter({
+    keyFields: [
+      {name: 'pk', type: 'string'},
+      {name: 'sk', type: 'string'}
+    ]
+  });
   const seen = [];
   const keyFromPath = (raw, adp) => {
     seen.push({raw, keyFields: adp.keyFields});
@@ -152,7 +157,10 @@ test('custom keyFromPath receives the raw segment + adapter', async t => {
   await withLambdaHandler(createLambdaAdapter(adapter, {keyFromPath}), async client => {
     await client('/tenant-1:sol-3');
     t.equal(seen[0].raw, 'tenant-1:sol-3', 'raw segment URL-decoded');
-    t.deepEqual(seen[0].keyFields, ['pk', 'sk']);
+    t.deepEqual(seen[0].keyFields, [
+      {name: 'pk', type: 'string'},
+      {name: 'sk', type: 'string'}
+    ]);
     t.deepEqual(adapter.calls[0].key, {pk: 'tenant-1', sk: 'sol-3'});
   });
 });

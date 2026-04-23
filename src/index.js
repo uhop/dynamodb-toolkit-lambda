@@ -123,7 +123,7 @@ const finalize = (neutral, multi) => {
 export const createLambdaAdapter = (adapter, options = {}) => {
   const policy = mergePolicy(options.policy);
   const sortableIndices = options.sortableIndices || {};
-  const keyFromPath = options.keyFromPath || ((rawKey, adp) => ({[adp.keyFields[0]]: rawKey}));
+  const keyFromPath = options.keyFromPath || ((rawKey, adp) => ({[adp.keyFields[0].name]: rawKey}));
   const exampleFromContext = options.exampleFromContext || (() => ({}));
   const maxBodyBytes = options.maxBodyBytes ?? 1024 * 1024;
   const mountPath = options.mountPath || '';
@@ -159,7 +159,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
     const {index, descending} = resolveSort(query, sortableIndices);
     if (descending) opts.descending = true;
     const example = exampleFromContext(makeExampleCtx(query, null, event, context));
-    const result = await adapter.getAll(opts, example, index);
+    const result = await adapter.getList(opts, example, index);
 
     const links = paginationLinks(result.offset, result.limit, result.total, urlBuilderFor(event, kind));
     const envelopeOpts = {keys: policy.envelope};
@@ -179,7 +179,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
     const {index} = resolveSort(query, sortableIndices);
     const example = exampleFromContext(makeExampleCtx(query, null, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
-    const r = await adapter.deleteAllByParams(params);
+    const r = await adapter.deleteListByParams(params);
     return jsonResponse(200, {processed: r.processed});
   };
 
@@ -233,7 +233,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
     if (!Array.isArray(body)) {
       return errorResponse(Object.assign(new Error('Body must be an array of items'), {status: 400, code: 'BadLoadBody'}));
     }
-    const r = await adapter.putAll(body);
+    const r = await adapter.putItems(body);
     return jsonResponse(200, {processed: r.processed});
   };
 
@@ -245,7 +245,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
     const {index} = resolveSort(query, sortableIndices);
     const example = exampleFromContext(makeExampleCtx(query, body, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
-    const r = await adapter.cloneAllByParams(params, item => ({...item, ...overlay}));
+    const r = await adapter.cloneListByParams(params, item => ({...item, ...overlay}));
     return jsonResponse(200, {processed: r.processed});
   };
 
@@ -257,7 +257,7 @@ export const createLambdaAdapter = (adapter, options = {}) => {
     const {index} = resolveSort(query, sortableIndices);
     const example = exampleFromContext(makeExampleCtx(query, body, event, context));
     const params = await adapter._buildListParams(opts, false, example, index);
-    const r = await adapter.moveAllByParams(params, item => ({...item, ...overlay}));
+    const r = await adapter.moveListByParams(params, item => ({...item, ...overlay}));
     return jsonResponse(200, {processed: r.processed});
   };
 

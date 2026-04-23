@@ -13,7 +13,7 @@ const {readJsonBody} = require('dynamodb-toolkit-lambda/read-lambda-body.js');
 
 // Minimal adapter stand-in: createLambdaAdapter only reads `keyFields` at
 // dispatch time, not at factory time. Enough for a require-shape smoke check.
-const fakeAdapter = {keyFields: ['name']};
+const fakeAdapter = {keyFields: [{name: 'name', type: 'string'}]};
 
 test('cjs: main entry symbols resolve via require()', t => {
   t.equal(typeof createLambdaAdapter, 'function', 'createLambdaAdapter factory');
@@ -33,7 +33,7 @@ test('cjs: factory accepts the full options surface', t => {
   const handler = createLambdaAdapter(fakeAdapter, {
     policy: {statusCodes: {miss: 410}},
     sortableIndices: {name: 'by-name-index'},
-    keyFromPath: (raw, adp) => ({[adp.keyFields[0]]: raw}),
+    keyFromPath: (raw, adp) => ({[adp.keyFields[0].name]: raw}),
     exampleFromContext: ({query, event}) => ({tenant: query.tenant || event.headers?.['x-tenant'] || 'default'}),
     maxBodyBytes: 64 * 1024,
     mountPath: '/things'

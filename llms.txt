@@ -23,7 +23,7 @@ Auto-detects the payload format (API Gateway v1 / v2 / Function URL / ALB) from 
 
 - `policy` — partial overrides for the rest-core policy.
 - `sortableIndices` — `{field: gsiName}` map for `?sort=field`.
-- `keyFromPath` — `(rawKey, adapter) => keyObject`. Default uses `adapter.keyFields[0]`.
+- `keyFromPath` — `(rawKey, adapter) => keyObject`. Default uses `adapter.keyFields[0].name`.
 - `exampleFromContext` — `(query, body, event, context) => example` threaded into `prepareListInput`. Receives both the Lambda event and context; v2 cookies are flattened into `event.headers.cookie` before this runs.
 - `maxBodyBytes` — tenant-level body cap (default 1 MiB). Enforced post-decode for base64 bodies.
 - `mountPath` — strip this prefix before dispatch. Same semantics as the Fetch adapter.

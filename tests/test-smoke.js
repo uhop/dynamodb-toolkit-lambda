@@ -23,6 +23,6 @@ test('smoke: handler returns a Lambda result envelope', async t => {
   const client = makeClient(handler);
   const res = await client('/');
   t.equal(typeof res, 'object', 'returns an object');
-  t.equal(res.statusCode, 200, 'root GET responds 200 from mock getAll');
+  t.equal(res.statusCode, 200, 'root GET responds 200 from mock getList');
   t.equal(typeof res.body, 'string', 'body is a string');
 });
