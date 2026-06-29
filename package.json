@@ -82,7 +82,7 @@
     "@aws-sdk/client-dynamodb": "^3.1031.0",
     "@aws-sdk/lib-dynamodb": "^3.1031.0",
     "@types/aws-lambda": "^8.10.155",
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.0.1",
     "dynamodb-toolkit": "^3.7.0",
     "prettier": "^3.8.1",
     "tape-six": "^1.7.13",
