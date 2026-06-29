@@ -1,14 +1,8 @@
-// JSON body reader for AWS Lambda event bodies.
-//
-// Lambda delivers request bodies as already-buffered strings — optionally
-// base64-encoded when the payload is binary or the trigger is configured for
-// base64-on-binary (ALB / API Gateway with binary-media-types). There is no
-// stream to guard, so the shape is much simpler than the Fetch adapter's
-// `readJsonBody` — one byte-length check then a JSON.parse.
-//
-// Errors are shaped to match the fetch / node:http adapters:
-//   - Oversize → `status: 413`, `code: 'PayloadTooLarge'`.
-//   - Invalid JSON → `status: 400`, `code: 'BadJsonBody'`.
+// @ts-self-types="./read-lambda-body.d.ts"
+
+// Lambda delivers request bodies as already-buffered strings, so this reader is
+// synchronous — no stream to guard, unlike the parent's stream-based reader.
+// Base64 decode precedes the size check so the cap applies to decoded bytes.
 
 import {Buffer} from 'node:buffer';
 

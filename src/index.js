@@ -1,3 +1,5 @@
+// @ts-self-types="./index.d.ts"
+
 // AWS Lambda adapter for dynamodb-toolkit v3.
 //
 // Translates Lambda event/result shapes (API Gateway v1, v2, Function URL, ALB)

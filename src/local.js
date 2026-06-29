@@ -1,22 +1,11 @@
-// Local-debug helpers — zero dependencies, for exercising a Lambda handler
-// against real HTTP traffic on a dev machine without deploying to AWS.
-//
-// What this gives you:
-//
-//   - `createNodeListener(handler, options?)` — a `(req, res) => void` wiring
-//     for `node:http`, so `http.createServer(createNodeListener(h)).listen(3000)`
-//     drives the exact Lambda code path with curl / Postman / your HTTP
-//     client of choice.
-//
-//   - `createFetchBridge(handler, options?)` — a `(request) => Promise<Response>`
-//     wiring for Fetch-style runtimes (Bun.serve, Deno.serve, Cloudflare
-//     Workers, Hono, itty-router). Same idea, no Node deps.
-//
-// Both helpers synthesize a full API Gateway event (v1 or v2) from the incoming
-// HTTP request, invoke the handler, and translate the Lambda result envelope
-// back into a real HTTP response. No framework deps — tenants who already have
-// Koa / Express can copy 10 lines of glue from the wiki (see Local-debugging
-// page) rather than bring a second integration library into this package.
+// @ts-self-types="./local.d.ts"
+
+// Zero-dependency local-debug bridges: drive the exact Lambda handler from real
+// HTTP traffic on a dev machine without deploying to AWS. Each bridge
+// synthesizes a full v1/v2 API Gateway event from the incoming request, invokes
+// the handler, and translates the result envelope back into an HTTP response.
+// No framework deps by design — tenants on Koa / Express copy a few lines of
+// glue from the wiki rather than pull a second integration library in here.
 
 import {Buffer} from 'node:buffer';
 
