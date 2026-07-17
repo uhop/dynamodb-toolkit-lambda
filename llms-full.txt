@@ -1,93 +1,14 @@
-# dynamodb-toolkit-lambda — extended reference
+# dynamodb-toolkit-lambda (frozen re-export thunk)
 
-> AWS Lambda adapter for `dynamodb-toolkit` v3. Serves the toolkit's standard REST route pack as a Lambda handler.
+> Superseded by the `dynamodb-toolkit/lambda` subpath export (dynamodb-toolkit 3.8.0+). This package re-exports that subpath verbatim and receives no further development.
 
-## Scope
+New code should import the subpaths directly:
 
-A thin translation layer between AWS Lambda event shapes and `dynamodb-toolkit`'s framework-agnostic pieces:
-
-- `matchRoute(method, path)` from `dynamodb-toolkit/handler` — pure route-shape recognizer.
-- Parsers from `dynamodb-toolkit/rest-core` — `parseFields`, `parseSort`, `parseFilter`, `parsePatch`, `parseNames`, `parsePaging`, `parseFlag`.
-- Builders + policy from `dynamodb-toolkit/rest-core` — `buildEnvelope`, `buildErrorBody`, `paginationLinks`, `defaultPolicy`, `mapErrorStatus`, `mergePolicy`.
-- A dynamodb-toolkit `Adapter` instance supplied by the caller.
-
-## API
-
-```ts
-export function createLambdaAdapter<TItem extends Record<string, unknown>>(
-  adapter: Adapter<TItem>,
-  options?: LambdaAdapterOptions<TItem>
-): (event: LambdaEvent, context: Context) => Promise<LambdaResult>;
-
-export interface LambdaExampleContext<TItem> {
-  query: Record<string, string>;
-  body: unknown;
-  adapter: Adapter<TItem>;
-  framework: 'lambda';
-  event: LambdaEvent;
-  context: Context;
-}
-
-export interface LambdaAdapterOptions<TItem> {
-  policy?: Partial<Policy>;
-  sortableIndices?: Record<string, string>;
-  keyFromPath?: (rawKey: string, adapter: Adapter<TItem>) => Record<string, unknown>;
-  exampleFromContext?: (context: LambdaExampleContext<TItem>) => Record<string, unknown>;
-  maxBodyBytes?: number;
-  mountPath?: string;
-}
+```js
+import {createLambdaAdapter} from 'dynamodb-toolkit/lambda';
+import {createNodeListener, createFetchBridge} from 'dynamodb-toolkit/lambda/local.js';
 ```
 
-## Supported event sources
-
-| Event type                                | Payload format     | Detection signal                     | Result envelope                         |
-| ----------------------------------------- | ------------------ | ------------------------------------ | --------------------------------------- |
-| API Gateway REST (v1)                     | `APIGatewayProxyEvent` (1.0) | default (neither `elb` nor `version: '2.0'`) | `APIGatewayProxyResult`                 |
-| API Gateway HTTP (v2) / Function URL v2.0 | `APIGatewayProxyEventV2`     | `event.version === '2.0'`                   | `APIGatewayProxyStructuredResultV2`     |
-| ALB                                       | `ALBEvent`         | `event.requestContext.elb`           | `ALBResult`                             |
-
-Auto-detected at call time. Response-header shape mirrors the request: ALB with multi-value mode enabled (`event.headers === null`, `event.multiValueHeaders` populated) gets `multiValueHeaders` back; everything else gets single-value `headers`.
-
-## Path / method / query / body surfacing
-
-| Event type | Method                                   | Path                          | Query (first-value wins)                                                  | Body                                           |
-| ---------- | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
-| REST v1    | `event.httpMethod`                       | `event.path`                  | prefers `multiValueQueryStringParameters[k][0]`, falls back to `queryStringParameters` | `event.body` (string, optionally base64) |
-| HTTP v2    | `event.requestContext.http.method`       | `event.rawPath`               | `queryStringParameters` (AWS collapses dupes with commas)                 | `event.body` (optionally base64)               |
-| Function URL v2 | same as HTTP v2                     | same                          | same                                                                      | same                                           |
-| ALB        | `event.httpMethod`                       | `event.path`                  | same as v1                                                                | `event.body` (optionally base64)               |
-
-v2 cookies from `event.cookies: string[]` are flattened into `event.headers.cookie` before `exampleFromContext` runs, so tenants see a consistent cookie shape regardless of trigger.
-
-## Local debugging
-
-`dynamodb-toolkit-lambda/local.js` ships zero-dep bridges so the same Lambda handler drives real HTTP requests locally — no Koa/Express dep, no deploy cycle.
-
-```ts
-export function createNodeListener(handler: Handler, options?: LocalDriverOptions): (req: IncomingMessage, res: ServerResponse) => Promise<void>;
-export function createFetchBridge(handler: Handler, options?: LocalDriverOptions): (request: Request) => Promise<Response>;
-
-export interface LocalDriverOptions {
-  eventShape?: 'v1' | 'v2';       // default 'v2'
-  context?: Context;              // fixed context for every invocation
-  makeContext?: () => Context;    // or a factory per invocation
-}
-```
-
-`createNodeListener` turns a Node HTTP request into an API Gateway event (v1 or v2), calls the handler, writes the result back through the response. Binary bodies are base64-encoded by content-type sniffing (matching AWS's binary-media-types behavior). Use with `http.createServer(...)`, or plug it into Koa / Express with a 1-line shim.
-
-`createFetchBridge` is the `Request → Response` equivalent for Bun.serve / Deno.serve / Cloudflare Workers / Hono.
-
-## Target runtimes
-
-- **AWS Lambda Node 20+ runtime.** Production target.
-- Local tests run under Node / Bun / Deno via tape-six. Local debugging uses `node:http` or any Fetch-capable runtime.
-
-## Reference
-
-- Parent toolkit: https://github.com/uhop/dynamodb-toolkit
-- Sibling adapter (Fetch): https://github.com/uhop/dynamodb-toolkit-fetch
-- Sibling adapter (Koa): https://github.com/uhop/dynamodb-toolkit-koa
-- Sibling adapter (Express): https://github.com/uhop/dynamodb-toolkit-express
-- Route pack contract: https://github.com/uhop/dynamodb-toolkit/wiki/HTTP-handler
-- Lambda adapter wiki: https://github.com/uhop/dynamodb-toolkit-lambda/wiki
+- API reference: https://github.com/uhop/dynamodb-toolkit/blob/master/llms.txt (§ Framework adapters)
+- Full reference: https://github.com/uhop/dynamodb-toolkit/blob/master/llms-full.txt (§ 7.4)
+- Wiki: https://github.com/uhop/dynamodb-toolkit/wiki/Lambda-adapter

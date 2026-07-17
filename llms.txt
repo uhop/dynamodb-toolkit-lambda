@@ -1,60 +1,14 @@
-# dynamodb-toolkit-lambda
+# dynamodb-toolkit-lambda (frozen re-export thunk)
 
-> AWS Lambda adapter for `dynamodb-toolkit` v3. Serves the toolkit's standard REST route pack as a Lambda handler for API Gateway (REST / HTTP), Lambda Function URLs, and ALB.
+> Superseded by the `dynamodb-toolkit/lambda` subpath export (dynamodb-toolkit 3.8.0+). This package re-exports that subpath verbatim and receives no further development.
 
-## Install
-
-```sh
-npm install dynamodb-toolkit-lambda dynamodb-toolkit
-```
-
-## API
-
-```ts
-export function createLambdaAdapter<TItem>(
-  adapter: Adapter<TItem>,
-  options?: LambdaAdapterOptions<TItem>
-): (event: LambdaEvent, context: Context) => Promise<LambdaResult>;
-```
-
-Auto-detects the payload format (API Gateway v1 / v2 / Function URL / ALB) from the incoming event and returns the matching result envelope. Single factory, single handler.
-
-### Options
-
-- `policy` — partial overrides for the rest-core policy.
-- `sortableIndices` — `{field: gsiName}` map for `?sort=field`.
-- `keyFromPath` — `(rawKey, adapter) => keyObject`. Default uses `adapter.keyFields[0].name`.
-- `exampleFromContext` — `(query, body, event, context) => example` threaded into `prepareListInput`. Receives both the Lambda event and context; v2 cookies are flattened into `event.headers.cookie` before this runs.
-- `maxBodyBytes` — tenant-level body cap (default 1 MiB). Enforced post-decode for base64 bodies.
-- `mountPath` — strip this prefix before dispatch. Same semantics as the Fetch adapter.
-
-## Quick start
+New code should import the subpaths directly:
 
 ```js
-import {Adapter} from 'dynamodb-toolkit';
-import {createLambdaAdapter} from 'dynamodb-toolkit-lambda';
-
-const adapter = new Adapter({client, table: 'planets', keyFields: ['name']});
-export const handler = createLambdaAdapter(adapter, {mountPath: '/planets'});
+import {createLambdaAdapter} from 'dynamodb-toolkit/lambda';
+import {createNodeListener, createFetchBridge} from 'dynamodb-toolkit/lambda/local.js';
 ```
 
-## Local debugging
-
-Ships a zero-dep bridge so the exact Lambda handler drives real HTTP requests on localhost.
-
-```js
-import http from 'node:http';
-import {createNodeListener} from 'dynamodb-toolkit-lambda/local.js';
-http.createServer(createNodeListener(handler)).listen(3000);
-```
-
-Also exports `createFetchBridge(handler)` for Bun.serve / Deno.serve / Cloudflare Workers.
-
-## Links
-
-- Parent toolkit: https://github.com/uhop/dynamodb-toolkit
-- Sibling (Fetch): https://github.com/uhop/dynamodb-toolkit-fetch
-- Sibling (Koa): https://github.com/uhop/dynamodb-toolkit-koa
-- Sibling (Express): https://github.com/uhop/dynamodb-toolkit-express
-- Route pack reference: https://github.com/uhop/dynamodb-toolkit/wiki/HTTP-handler
-- Lambda adapter wiki: https://github.com/uhop/dynamodb-toolkit-lambda/wiki
+- API reference: https://github.com/uhop/dynamodb-toolkit/blob/master/llms.txt (§ Framework adapters)
+- Full reference: https://github.com/uhop/dynamodb-toolkit/blob/master/llms-full.txt (§ 7.4)
+- Wiki: https://github.com/uhop/dynamodb-toolkit/wiki/Lambda-adapter
